@@ -1,6 +1,9 @@
 # Sora — Soroban Workbench
 
-A Postman-style developer workbench for [Soroban](https://soroban.stellar.org) smart contracts on the Stellar network. Load any contract by address, inspect its ABI, fill in parameters with type-aware inputs, simulate or invoke functions, and save call sets to reusable collections — all from the browser, with no local tooling required.
+A Postman-style developer workbench for [Soroban](https://soroban.stellar.org) smart contracts on the Stellar network. Load any contract by address, inspect its ABI, fill in parameters with type-aware inputs, simulate or invoke functions, and save call sets to reusable collections — all from the browser, with no local tooling required. 
+
+join TG Chanel
+https://t.me/+mUl2WidjFcU0NTY0
 
 ---
 
