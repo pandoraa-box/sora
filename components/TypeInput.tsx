@@ -22,17 +22,15 @@ function placeholder(type: ParsedType): string {
   }
   switch (type.name) {
     case 'address': return 'G… or C…';
-    case 'u32': case 'u64': case 'i32': case 'i64': return '0';
+    case 'u32': case 'u64': case 'i32': case 'i64':
     case 'u128': case 'i128': case 'u256': case 'i256': return '0';
     case 'bytes': return 'hex encoded';
-    case 'string': return '';
-    case 'symbol': return '';
     default: return '';
   }
 }
 
 const fieldClass =
-  'w-full bg-field border border-edge rounded-lg px-4 py-8 text-lg font-mono text-fg placeholder:text-fg4 focus:border-fg3 transition-colors';
+  'w-full bg-field border border-edge rounded-lg px-3 py-2 text-sm font-mono text-fg placeholder:text-fg4 focus:border-fg3 focus:outline-none transition-colors';
 
 export function TypeInput({ name, type, value, onChange }: Props) {
   const label = typeLabel(type);
@@ -40,17 +38,17 @@ export function TypeInput({ name, type, value, onChange }: Props) {
   const isBool = type.kind === 'primitive' && type.name === 'bool';
 
   const Header = (
-    <div className="flex items-baseline gap-3 mb-1.5">
-      <span className="text-lg font-mono text-fg">{name}</span>
-      <span className="text-sm font-mono text-fg3">{label}</span>
+    <div className="flex items-baseline gap-2 mb-1.5">
+      <span className="text-sm font-mono text-fg">{name}</span>
+      <span className="text-xs font-mono text-fg4">{label}</span>
     </div>
   );
 
   if (isVoid) {
     return (
-      <div className="flex items-center gap-3.5 py-8">
-        <span className="text-lg font-mono text-fg2">{name}</span>
-        <span className="text-sm font-mono text-fg3">void · no value</span>
+      <div className="flex items-center gap-2.5 py-3">
+        <span className="text-sm font-mono text-fg3">{name}</span>
+        <span className="text-xs font-mono text-fg4">void · no value</span>
       </div>
     );
   }
@@ -59,13 +57,13 @@ export function TypeInput({ name, type, value, onChange }: Props) {
     return (
       <div>
         {Header}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {(['true', 'false'] as const).map((opt) => (
             <button
               key={opt}
               type="button"
               onClick={() => onChange(opt)}
-              className={`px-4 py-2 text-base font-mono border rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-sm font-mono border rounded-lg transition-colors ${
                 value === opt
                   ? 'bg-ink text-paper border-ink'
                   : 'bg-transparent text-fg3 border-edge hover:border-fg3 hover:text-fg2'

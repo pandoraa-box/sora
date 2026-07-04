@@ -4,6 +4,18 @@ import { useState, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { connectWallet, disconnect } from '@/lib/wallet';
 
+function WalletIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 12V22H4V12" />
+      <path d="M22 7H2v5h20V7z" />
+      <path d="M12 22V7" />
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+    </svg>
+  );
+}
+
 export function WalletButton() {
   const { wallet, setWallet, clearWallet, network } = useStore();
   const [loading, setLoading] = useState(false);
@@ -33,27 +45,29 @@ export function WalletButton() {
     return (
       <button
         onClick={handleDisconnect}
-        className="flex items-center gap-3 bg-ink/10 border border-ink/30 px-4 py-2 rounded-lg text-sm font-semibold text-ink hover:bg-ink/20 transition-colors"
+        className="flex items-center gap-2 bg-ink/10 border border-ink/30 px-3 py-1.5 rounded-lg text-sm font-medium text-ink hover:bg-ink/20 transition-colors"
       >
-        <span className="w-3 h-3 rounded-full bg-ink shrink-0" />
-        <span>{wallet.address.slice(0, 4)}…{wallet.address.slice(-4)}</span>
+        <span className="w-2 h-2 rounded-full bg-ink shrink-0" />
+        <span className="font-mono text-xs">{wallet.address.slice(0, 4)}…{wallet.address.slice(-4)}</span>
       </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       {error && (
-        <span className="text-sm font-mono text-fg2 max-w-40 truncate" title={error}>
+        <span className="text-xs font-mono text-red-400 max-w-36 truncate hidden sm:block" title={error}>
           {error}
         </span>
       )}
       <button
         onClick={connect}
         disabled={loading}
-        className="bg-blue-600 border border-transparent px-4 py-2 rounded-lg text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+        className="flex items-center gap-2 bg-ink text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'connecting…' : 'connect wallet'}
+        <WalletIcon />
+        <span className="hidden sm:inline">{loading ? 'Connecting…' : 'Connect Wallet'}</span>
+        <span className="sm:hidden">{loading ? '…' : 'Connect'}</span>
       </button>
     </div>
   );

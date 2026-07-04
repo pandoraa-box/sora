@@ -22,18 +22,22 @@ function formatValue(v: unknown): string {
 export function ResultPanel({ result, status }: Props) {
   if (status === 'idle') {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-fg4 text-base font-mono">simulate or invoke to see results</p>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <div className="font-mono text-fg4 text-2xl select-none">&gt;_</div>
+        <div>
+          <p className="text-sm font-medium text-fg3">Response Panel</p>
+          <p className="text-xs text-fg4 mt-1">Execute a function to see results here</p>
+        </div>
       </div>
     );
   }
 
   if (status === 'loading') {
     return (
-      <div className="flex-1 flex items-center justify-center gap-6">
-        <span className="w-1 h-1 rounded-full bg-fg3 animate-pulse" />
-        <span className="text-fg3 text-base font-mono">running</span>
-        <span className="w-1 h-1 rounded-full bg-fg3 animate-pulse" style={{ animationDelay: '0.35s' }} />
+      <div className="flex-1 flex items-center justify-center gap-3">
+        <span className="w-1.5 h-1.5 rounded-full bg-fg3 animate-pulse" />
+        <span className="text-sm font-mono text-fg3">running</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-fg3 animate-pulse" style={{ animationDelay: '0.35s' }} />
       </div>
     );
   }
@@ -46,28 +50,28 @@ export function ResultPanel({ result, status }: Props) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Status bar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-subtle shrink-0 metal-strip">
-        <span className={`text-base font-mono font-bold ${isErr ? 'text-fg2' : 'text-ink'}`}>
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-edge shrink-0">
+        <span className={`text-sm font-mono font-bold ${isErr ? 'text-red-400' : 'text-green-400'}`}>
           {isErr ? '✕' : '✓'}
         </span>
-        <span className="text-base font-mono text-fg2">{result.type}</span>
+        <span className="text-xs font-mono text-fg2">{result.type}</span>
         {result.latencyMs !== undefined && (
-          <span className="text-base font-mono text-fg3">{Math.round(result.latencyMs)}ms</span>
+          <span className="text-xs font-mono text-fg3">{Math.round(result.latencyMs)}ms</span>
         )}
         {result.txHash && (
-          <span className="text-base font-mono text-fg3 truncate max-w-48" title={result.txHash}>
-            {result.txHash.slice(0, 8)}…{result.txHash.slice(-6)}
+          <span className="text-xs font-mono text-fg4 truncate max-w-32" title={result.txHash}>
+            {result.txHash.slice(0, 6)}…{result.txHash.slice(-4)}
           </span>
         )}
         <div className="flex-1" />
-        <span className="text-sm font-mono text-fg4">
+        <span className="text-xs font-mono text-fg4">
           {new Date(result.timestamp).toLocaleTimeString()}
         </span>
       </div>
 
       {/* Result body */}
       <div className="flex-1 overflow-auto p-4">
-        <pre className={`text-base font-mono leading-relaxed whitespace-pre-wrap break-all ${isErr ? 'text-fg2' : 'text-fg'}`}>
+        <pre className={`text-sm font-mono leading-relaxed whitespace-pre-wrap break-all ${isErr ? 'text-red-300' : 'text-fg'}`}>
           {body}
         </pre>
       </div>
