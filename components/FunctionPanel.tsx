@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useStore } from '@/lib/store';
-import { simulateCall, invokeCall } from '@/lib/soroban/client';
+import { simulateCall, invokeCall, checkRestoreRequired } from '@/lib/soroban/client';
 import { argsToNative, typeLabel } from '@/lib/soroban/args';
 import { signTx } from '@/lib/wallet';
 import { TypeInput } from './TypeInput';
@@ -19,18 +19,49 @@ export function FunctionPanel({ fn }: Props) {
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [restorePending, setRestorePending] = useState(false);
 
   const setValue = useCallback((name: string, v: string) => {
     setValues((p) => ({ ...p, [name]: v }));
   }, []);
+
+  function recordError(type: 'simulate' | 'invoke', err: unknown, t0: number) {
+    if (!contract) return;
+    const entry: CallResult = {
+      type, status: 'error', functionName: fn.name, args: values,
+      error: err instanceof Error ? err.message : String(err),
+      latencyMs: performance.now() - t0, timestamp: Date.now(),
+    };
+    setCallResult(entry, 'error');
+    pushHistory({ ...entry, contractId: contract.contractId });
+  }
+
+  async function invokeFlow(nativeArgs: Record<string, unknown>, t0: number) {
+    if (!contract || !wallet.address) return;
+    try {
+      const inv = await invokeCall(
+        contract.contractId, network, fn.name, nativeArgs, wallet.address,
+        (xdr) => signTx(xdr, network.networkPassphrase, wallet.address!)
+      );
+      const entry: CallResult = {
+        type: 'invoke', status: 'success', functionName: fn.name,
+        args: values, result: inv.returnValue, txHash: inv.txHash, latencyMs: inv.latencyMs, timestamp: Date.now(),
+      };
+      setCallResult(entry, 'success');
+      pushHistory({ ...entry, contractId: contract.contractId });
+    } catch (err) {
+      recordError('invoke', err, t0);
+    }
+  }
 
   async function run(type: 'simulate' | 'invoke') {
     if (!contract) return;
     setCallResult(null, 'loading');
     const t0 = performance.now();
     const nativeArgs = argsToNative(fn.inputs, values, contract.udts);
-    try {
-      if (type === 'simulate') {
+
+    if (type === 'simulate') {
+      try {
         const sim = await simulateCall(contract.contractId, network, fn.name, nativeArgs);
         const entry: CallResult = {
           type: 'simulate', status: 'success', functionName: fn.name,
@@ -38,28 +69,31 @@ export function FunctionPanel({ fn }: Props) {
         };
         setCallResult(entry, 'success');
         pushHistory({ ...entry, contractId: contract.contractId });
-      } else {
-        if (!wallet.address) return;
-        const inv = await invokeCall(
-          contract.contractId, network, fn.name, nativeArgs, wallet.address,
-          (xdr) => signTx(xdr, network.networkPassphrase, wallet.address!)
-        );
-        const entry: CallResult = {
-          type: 'invoke', status: 'success', functionName: fn.name,
-          args: values, result: inv.returnValue, txHash: inv.txHash, latencyMs: inv.latencyMs, timestamp: Date.now(),
-        };
-        setCallResult(entry, 'success');
-        pushHistory({ ...entry, contractId: contract.contractId });
+      } catch (err) {
+        recordError('simulate', err, t0);
       }
-    } catch (err) {
-      const entry: CallResult = {
-        type, status: 'error', functionName: fn.name, args: values,
-        error: err instanceof Error ? err.message : String(err),
-        latencyMs: performance.now() - t0, timestamp: Date.now(),
-      };
-      setCallResult(entry, 'error');
-      pushHistory({ ...entry, contractId: contract.contractId });
+      return;
     }
+
+    // invoke: pre-flight check for expired ledger entries that need restoring
+    if (!wallet.address) return;
+    setRestorePending(false);
+    let needsRestore = false;
+    try {
+      needsRestore = await checkRestoreRequired(
+        contract.contractId, network, fn.name, nativeArgs, wallet.address
+      );
+    } catch (err) {
+      recordError('invoke', err, t0);
+      return;
+    }
+    if (needsRestore) {
+      // stop and show the restore banner; the user confirms before signing
+      setRestorePending(true);
+      setCallResult(null, 'idle');
+      return;
+    }
+    await invokeFlow(nativeArgs, t0);
   }
 
   function saveToCollection() {
@@ -133,6 +167,43 @@ export function FunctionPanel({ fn }: Props) {
           )}
         </div>
       </div>
+
+      {/* Restore banner */}
+      {restorePending && contract && (
+        <div className="px-5 py-3 border-t border-edge bg-amber-500/10">
+          <div className="flex items-start gap-2">
+            <span className="text-sm leading-6 text-amber-400">⚠</span>
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-sm font-mono font-semibold text-amber-200">
+                Expired ledger entries found — a restore transaction is required before invoke
+              </p>
+              <p className="text-xs font-mono text-fg2">
+                Your wallet will be asked to sign <span className="text-fg">two</span> transactions:
+                first the restore of the expired entries, then the invocation itself.
+              </p>
+            </div>
+          </div>
+          <div className="mt-2.5 flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (!contract || !wallet.address) return;
+                setRestorePending(false);
+                setCallResult(null, 'loading');
+                invokeFlow(argsToNative(fn.inputs, values, contract.udts), performance.now());
+              }}
+              className="flex items-center gap-2 h-8 px-3 bg-amber-500 text-ink rounded-lg text-xs font-semibold hover:bg-amber-400 transition-colors"
+            >
+              Restore &amp; Invoke
+            </button>
+            <button
+              onClick={() => setRestorePending(false)}
+              className="text-xs font-mono text-fg4 hover:text-fg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Action bar */}
       <div className="px-5 py-3 flex items-center gap-3 shrink-0 border-t border-edge bg-panel metal-strip">
