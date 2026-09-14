@@ -69,6 +69,56 @@ export interface InvokeResult {
   latencyMs: number;
 }
 
+// Whether the last simulation failed because the transaction exceeded the
+// resource limits (fee, CPU instructions or memory).
+function isInsufficientResources(at: contract.AssembledTransaction<unknown>): boolean {
+  const sim = at.simulation;
+  return !!sim && rpc.Api.isSimulationError(sim) && /insufficient\s*resource/i.test(sim.error);
+}
+
+// Simulates with automatic restore of expired ledger entries (restore: true).
+// If the simulation fails with InsufficientResources, bumps the transaction
+// fee (resource limits) and retries exactly once.
+async function simulateWithRestore(at: contract.AssembledTransaction<unknown>): Promise<void> {
+  await at.simulate({ restore: true });
+  if (isInsufficientResources(at) && at.built) {
+    const fee = Number(at.built.fee);
+    if (Number.isFinite(fee) && fee > 0) {
+      at.built.fee = String(Math.ceil(fee * 2));
+      await at.simulate({ restore: true });
+    }
+  }
+}
+
+// Pre-flight check: whether the contract has expired ledger entries that must
+// be restored before the invocation can succeed (i.e. a restore transaction
+// will need to be signed and sent before the invoke transaction).
+export async function checkRestoreRequired(
+  contractId: string,
+  network: NetworkConfig,
+  functionName: string,
+  args: Record<string, unknown>,
+  publicKey: string
+): Promise<boolean> {
+  const client = await contract.Client.from({
+    contractId,
+    networkPassphrase: network.networkPassphrase,
+    rpcUrl: network.rpcUrl,
+    publicKey,
+  });
+
+  // Dynamic dispatch — contract.Client generates one method per spec function
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c = client as any;
+  if (typeof c[functionName] !== 'function') {
+    throw new Error(`Function '${functionName}' not found on contract`);
+  }
+
+  const at: contract.AssembledTransaction<unknown> = await c[functionName](args, { simulate: false });
+  await at.simulate({ restore: false });
+  return !!at.simulation && rpc.Api.isSimulationRestore(at.simulation);
+}
+
 export async function invokeCall(
   contractId: string,
   network: NetworkConfig,
@@ -84,6 +134,14 @@ export async function invokeCall(
     networkPassphrase: network.networkPassphrase,
     rpcUrl: network.rpcUrl,
     publicKey,
+    // Required for automatic restore: the SDK builds and signs the
+    // RestoreFootprint transaction through this handler, prompting the wallet
+    // a first time, before the invoke transaction is signed a second time.
+    // (The SDK expects the Freighter-style `{ signedTxXdr }` return shape.)
+    signTransaction: async (txXdr) => {
+      const signedTxXdr = await signTransaction(txXdr);
+      return { signedTxXdr };
+    },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,7 +152,7 @@ export async function invokeCall(
 
   const at: contract.AssembledTransaction<unknown> = await c[functionName](args, { simulate: false });
 
-  await at.simulate({ restore: false });
+  await simulateWithRestore(at);
 
   const builtTx = at.built;
   if (!builtTx) throw new Error('Transaction build failed — simulation may have failed');
